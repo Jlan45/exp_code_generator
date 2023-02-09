@@ -1,0 +1,19 @@
+{
+  "vul_num": "['vul_num']",
+  "vul_id": "['id']",
+  "app_name": "['get_vu_sub']['product_name']",
+  "cve_num": "['get_vu_sub']['cve_num']",
+  "cnvd_num": "['get_vu_sub']['cnvd_num']",
+  "appVersion": "['get_vu_sub']['affect_ver']",
+  "reqAuth": "['auth_type']",
+  "appPowerLink": "['get_vu_sub']['store_website']",
+  "desc": "['bug_desc']",
+  "suggest": "['get_vu_sub']['temp_plan']",
+  "suricata_rules": "['suricata_rule']",
+  "create_date": "['get_vu_sub']['ver_open_date']",
+  "update_date": "['get_vu_sub']['updated_at']",
+  "vul_date": "['get_vu_sub']['created_at']",
+  "vul_type": "['get_vu_sub']['vul_type']",
+  "vul_name": "['get_vu_sub']['name']",
+  "severity": "['get_vu_sub']['vul_level']"
+}
